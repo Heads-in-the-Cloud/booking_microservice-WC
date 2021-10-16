@@ -82,8 +82,12 @@ public class BookingService {
 				.collect(Collectors.toList());
 	}
 
-	public List<Booking> getBookingByUsernameQuery(String username) {
-		return booking_repository.getBookingsByUser(username);
+	public Optional<List<Booking>> getBookingByUsernameQuery(String username) {
+		try {
+			return Optional.of(booking_repository.getBookingsByUser(username));
+		} catch (Exception e) {
+			return Optional.empty();
+		}
 
 	}
 
@@ -92,12 +96,12 @@ public class BookingService {
 	}
 
 	public List<Flight> getFlightByBookingId(List<Booking> bookings) {
-		
-		bookings.stream().forEach( x -> {
-			
-		System.out.println(flight_repository.getFlightByBooking(x.getId()));
-	});
-		
+
+		bookings.stream().forEach(x -> {
+
+			System.out.println(flight_repository.getFlightByBooking(x.getId()));
+		});
+
 		return bookings.stream().map(x -> flight_repository.getFlightByBooking(x.getId())).collect(Collectors.toList());
 	}
 
@@ -127,27 +131,22 @@ public class BookingService {
 		System.out.println(passenger_id);
 
 		// delete booking if the last passenger is deleted
-		System.out.println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
 		try {
-			
 
 			Passenger passenger = passenger_repository.findById(passenger_id).get();
-			
+
 			passenger_repository.deleteById(passenger_id);
 
 			System.out.println(passenger.getBooking_id());
-			
+
 			if (booking_repository.findById(passenger.getBooking_id()).get().getPassengers().size() == 0) {
 				booking_repository.deleteById(passenger.getBooking_id());
-				System.out.println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
 
-
-			} 
+			}
 
 			return Boolean.TRUE;
 
 		} catch (Exception e) {
-			System.out.println("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFf");
 
 			return Boolean.FALSE;
 		}
@@ -155,11 +154,11 @@ public class BookingService {
 
 	public Boolean deleteBookingById(Integer booking_id) {
 		try {
-		
-		booking_repository.deleteById(booking_id);
-		return Boolean.TRUE;
-		
-		} catch(Exception e) {
+
+			booking_repository.deleteById(booking_id);
+			return Boolean.TRUE;
+
+		} catch (Exception e) {
 			return Boolean.FALSE;
 		}
 	}

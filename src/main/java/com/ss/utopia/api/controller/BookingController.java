@@ -32,6 +32,7 @@ import com.ss.utopia.api.pojo.BookingPayment;
 import com.ss.utopia.api.pojo.Flight;
 import com.ss.utopia.api.pojo.Passenger;
 import com.ss.utopia.api.service.BookingService;
+import com.ss.utopia.api.service.FlightBookingService;
 import com.ss.utopia.api.service.UserBookingService;
 
 @RestController
@@ -43,7 +44,11 @@ public class BookingController {
 	
 	@Autowired
 	UserBookingService user_booking_service;
-
+	
+	@Autowired
+	FlightBookingService flight_booking_service;
+	
+	
 	@GetMapping(path = "/read")
 	public ResponseEntity<List<Booking>> findAllBookings() {
 		return ResponseEntity.ok().body(booking_service.findAllBookings());
@@ -92,8 +97,14 @@ public class BookingController {
 	
 	@GetMapping(path = "/read/passengers/id={username}")
 	public ResponseEntity<List<Passenger>> getPassengerByUsername(@PathVariable String username) {
+		
+		Optional<List<Booking>> bookings = user_booking_service.getBookingByUsernameQuery(username);
+		if(bookings.isEmpty()) {
+			return ResponseEntity.notFound().build();
+		}
+		
 		return ResponseEntity.ok()
-				.body(booking_service.getPassengerByBooking(booking_service.getBookingByUsernameQuery(username)));
+				.body(booking_service.getPassengerByBooking(bookings.get()));
 
 	}
 	
@@ -101,10 +112,13 @@ public class BookingController {
 	@GetMapping(path = "/read/flights/id={username}")
 	public ResponseEntity<List<Flight>> getFlightByUsername(@PathVariable String username) {
 
-
-		
+		Optional<List<Booking>> bookings = user_booking_service.getBookingByUsernameQuery(username);
+		if(bookings.isEmpty()) {
+			return ResponseEntity.notFound().build();
+		}
+				
 		return ResponseEntity.ok()
-				.body(booking_service.getFlightByBookingId(booking_service.getBookingByUsernameQuery(username)).stream()
+				.body(booking_service.getFlightByBookingId(bookings.get()).stream()
 						.filter(distinctByKey(Flight::getId)).collect(Collectors.toList()));
 	}
 	@GetMapping(path = "/read/bookings/cancelled")
