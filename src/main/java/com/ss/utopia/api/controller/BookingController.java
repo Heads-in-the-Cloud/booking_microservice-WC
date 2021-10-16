@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 import javax.transaction.Transactional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -31,6 +32,7 @@ import com.ss.utopia.api.pojo.BookingPayment;
 import com.ss.utopia.api.pojo.Flight;
 import com.ss.utopia.api.pojo.Passenger;
 import com.ss.utopia.api.service.BookingService;
+import com.ss.utopia.api.service.UserBookingService;
 
 @RestController
 @RequestMapping(path = "/booking")
@@ -38,6 +40,9 @@ public class BookingController {
 
 	@Autowired
 	BookingService booking_service;
+	
+	@Autowired
+	UserBookingService user_booking_service;
 
 	@GetMapping(path = "/read")
 	public ResponseEntity<List<Booking>> findAllBookings() {
@@ -47,12 +52,26 @@ public class BookingController {
 	
 	@GetMapping("/read/id={booking_id}")
 	public ResponseEntity<Booking> findBookingById(@PathVariable Integer booking_id) {
-		return ResponseEntity.ok().body(booking_service.findBookingById(booking_id));
+		Optional<Booking> booking = booking_service.getBookingById(booking_id);
+		
+		if(booking.isEmpty()) {
+			
+			return ResponseEntity.notFound().build();	
+		}
+		
+		return ResponseEntity.ok().body(booking.get());
 	}
 
-	@GetMapping(path = "/read/user={username}")
+	@GetMapping(path = "/read/id={username}")
 	public ResponseEntity<List<Booking>> getBookingByUsername(@PathVariable String username) {
-		return ResponseEntity.ok().body(booking_service.getBookingByUsernameQuery(username));
+		
+		Optional<List<Booking>> bookings = user_booking_service.getBookingByUsernameQuery(username);
+		
+		if(bookings.isEmpty()) {
+			return ResponseEntity.notFound().build();
+		}
+		
+		return ResponseEntity.ok().body(bookings.get());
 	}
 	
 	@GetMapping(path = "/read/passengers")
@@ -63,10 +82,15 @@ public class BookingController {
 	
 	@GetMapping("/read/passenger/id={passenger_id}")
 	public ResponseEntity<Passenger> findPassengerById(@PathVariable Integer passenger_id) {
-		return ResponseEntity.ok().body(booking_service.findPassengerById(passenger_id));
+		Optional<Passenger> passenger = booking_service.findPassengerById(passenger_id);
+		if(passenger.isEmpty()) {
+			return ResponseEntity.notFound().build();
+		}
+		
+		return ResponseEntity.ok().body(passenger.get());
 	}
 	
-	@GetMapping(path = "/read/passengers/user={username}")
+	@GetMapping(path = "/read/passengers/id={username}")
 	public ResponseEntity<List<Passenger>> getPassengerByUsername(@PathVariable String username) {
 		return ResponseEntity.ok()
 				.body(booking_service.getPassengerByBooking(booking_service.getBookingByUsernameQuery(username)));
@@ -74,10 +98,11 @@ public class BookingController {
 	}
 	
 	
-
-	@GetMapping(path = "/read/flights/user={username}")
+	@GetMapping(path = "/read/flights/id={username}")
 	public ResponseEntity<List<Flight>> getFlightByUsername(@PathVariable String username) {
 
+
+		
 		return ResponseEntity.ok()
 				.body(booking_service.getFlightByBookingId(booking_service.getBookingByUsernameQuery(username)).stream()
 						.filter(distinctByKey(Flight::getId)).collect(Collectors.toList()));
@@ -129,9 +154,9 @@ public class BookingController {
 	}
 
 
-
-	@DeleteMapping("/delete/passenger={passenger_id}")
+	@DeleteMapping("/delete/passenger/id={passenger_id}")
 	public ResponseEntity<?> deletePassengerById(@PathVariable Integer passenger_id) {
+		
 		booking_service.deletePassengerById(passenger_id);
 
 		return ResponseEntity.noContent().build();
@@ -140,10 +165,13 @@ public class BookingController {
 	@Transactional
 	@DeleteMapping("/delete/booking={booking_id}")
 	public ResponseEntity<?> deleteBookingById(@PathVariable Integer booking_id) {
-		booking_service.deleteBookingById(booking_id);
+		if (booking_service.deleteBookingById(booking_id))
+			return ResponseEntity.noContent().build();
 
-		return ResponseEntity.noContent().build();
+		return ResponseEntity.badRequest().build();
 	}
+	
+	///////////////////////////////////////////////////////////////////////
 	
 	@PutMapping("/update/passenger")
 	public  ResponseEntity<Passenger> updatePassengers(@RequestBody Passenger passenger) {
