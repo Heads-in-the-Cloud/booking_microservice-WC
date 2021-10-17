@@ -103,6 +103,9 @@ public class Booking {
 	public BookingPayment getBooking_payment() {
 		return booking_payment;
 	}
+	public void setBooking_payment(BookingPayment booking_payment) {
+		this.booking_payment = booking_payment;
+	}
 
 	public BookingGuest getBooking_guest() {
 		return booking_guest;
@@ -112,9 +115,7 @@ public class Booking {
 		this.booking_guest = booking_guest;
 	}
 
-	public void setBooking_payment(BookingPayment booking_payment) {
-		this.booking_payment = booking_payment;
-	}
+	
 
 	public FlightBookings getFlight_bookings() {
 		return flight_bookings;

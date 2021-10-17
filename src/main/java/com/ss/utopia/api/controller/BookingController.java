@@ -41,100 +41,97 @@ public class BookingController {
 
 	@Autowired
 	BookingService booking_service;
-	
+
 	@Autowired
 	UserBookingService user_booking_service;
-	
+
 	@Autowired
 	FlightBookingService flight_booking_service;
-	
-	
+
 	@GetMapping(path = "/read")
 	public ResponseEntity<List<Booking>> findAllBookings() {
 		return ResponseEntity.ok().body(booking_service.findAllBookings());
 
 	}
-	
+
 	@GetMapping("/read/id={booking_id}")
 	public ResponseEntity<Booking> findBookingById(@PathVariable Integer booking_id) {
 		Optional<Booking> booking = booking_service.getBookingById(booking_id);
-		
-		if(booking.isEmpty()) {
-			
-			return ResponseEntity.notFound().build();	
+
+		if (booking.isEmpty()) {
+
+			return ResponseEntity.notFound().build();
 		}
-		
+
 		return ResponseEntity.ok().body(booking.get());
 	}
 
-	@GetMapping(path = "/read/id={username}")
+	@GetMapping(path = "/read/user={username}")
 	public ResponseEntity<List<Booking>> getBookingByUsername(@PathVariable String username) {
-		
+
 		Optional<List<Booking>> bookings = user_booking_service.getBookingByUsernameQuery(username);
-		
-		if(bookings.isEmpty()) {
+
+		if (bookings.isEmpty()) {
 			return ResponseEntity.notFound().build();
 		}
-		
+
 		return ResponseEntity.ok().body(bookings.get());
 	}
-	
+
 	@GetMapping(path = "/read/passengers")
 	public ResponseEntity<List<Passenger>> findAllPassengers() {
 		return ResponseEntity.ok().body(booking_service.findAllPassengers());
 
 	}
-	
+
 	@GetMapping("/read/passenger/id={passenger_id}")
-	public ResponseEntity<Passenger> findPassengerById(@PathVariable Integer passenger_id) {
-		Optional<Passenger> passenger = booking_service.findPassengerById(passenger_id);
-		if(passenger.isEmpty()) {
+	public ResponseEntity<Passenger> getPassengerById(@PathVariable Integer passenger_id) {
+		Optional<Passenger> passenger = booking_service.getPassengerById(passenger_id);
+		if (passenger.isEmpty()) {
 			return ResponseEntity.notFound().build();
 		}
-		
+
 		return ResponseEntity.ok().body(passenger.get());
 	}
-	
+
 	@GetMapping(path = "/read/passengers/id={username}")
 	public ResponseEntity<List<Passenger>> getPassengerByUsername(@PathVariable String username) {
-		
+
 		Optional<List<Booking>> bookings = user_booking_service.getBookingByUsernameQuery(username);
-		if(bookings.isEmpty()) {
+		if (bookings.isEmpty()) {
 			return ResponseEntity.notFound().build();
 		}
-		
-		return ResponseEntity.ok()
-				.body(booking_service.getPassengerByBooking(bookings.get()));
+
+		return ResponseEntity.ok().body(booking_service.getPassengerByBooking(bookings.get()));
 
 	}
-	
-	
+
 	@GetMapping(path = "/read/flights/id={username}")
 	public ResponseEntity<List<Flight>> getFlightByUsername(@PathVariable String username) {
 
 		Optional<List<Booking>> bookings = user_booking_service.getBookingByUsernameQuery(username);
-		if(bookings.isEmpty()) {
+		if (bookings.isEmpty()) {
 			return ResponseEntity.notFound().build();
 		}
-				
-		return ResponseEntity.ok()
-				.body(booking_service.getFlightByBookingId(bookings.get()).stream()
-						.filter(distinctByKey(Flight::getId)).collect(Collectors.toList()));
+
+		return ResponseEntity.ok().body(booking_service.getFlightByBookingId(bookings.get()).stream()
+				.filter(distinctByKey(Flight::getId)).collect(Collectors.toList()));
 	}
-	@GetMapping(path = "/read/bookings/cancelled")
+
+	@GetMapping(path = "/read/cancelled")
 	public ResponseEntity<List<Booking>> getCancelledBookings() {
 		return ResponseEntity.ok().body(booking_service.getCancelledBookings());
 	}
-	@GetMapping(path = "/read/bookings/refunded")
+
+	@GetMapping(path = "/read/refunded")
 	public ResponseEntity<List<BookingPayment>> getRefundedBookings() {
 		return ResponseEntity.ok().body(booking_service.getRefundedBookings());
 	}
 
-	
 	@PostMapping("/add/passenger")
 	public ResponseEntity<Passenger> addPassenger(@RequestBody Passenger passenger) {
-		URI uri = URI.create(ServletUriComponentsBuilder.fromCurrentContextPath().path("/read/passenger=" + passenger.getId())
-				.toUriString());
+		URI uri = URI.create(ServletUriComponentsBuilder.fromCurrentContextPath()
+				.path("/read/passenger=" + passenger.getId()).toUriString());
 		return ResponseEntity.created(uri).body(booking_service.save(passenger));
 	}
 
@@ -144,33 +141,45 @@ public class BookingController {
 		return booking_service.saveBookingAgentBooking(passenger, agent_id, flight_id);
 	}
 
-
 	@PostMapping("/add/user={user_id}/flight={flight_id}")
 	public ResponseEntity<Booking> addBookingByUser(@RequestBody Passenger passenger, @PathVariable Integer user_id,
 			@PathVariable Integer flight_id) {
-		URI uri = URI.create(ServletUriComponentsBuilder.fromCurrentContextPath().path("/read/id=" + passenger.getBooking_id())
-				.toUriString());
+		URI uri = URI.create(ServletUriComponentsBuilder.fromCurrentContextPath()
+				.path("/read/id=" + passenger.getBooking_id()).toUriString());
 
 		return ResponseEntity.created(uri).body(booking_service.saveBookingUserBooking(passenger, user_id, flight_id));
 	}
-	
+
 	@PostMapping("/add")
-	public ResponseEntity<Booking> addBooking(@RequestBody Booking booking){
+	public ResponseEntity<Booking> addBooking(@RequestBody Booking booking) {
 		Optional<Booking> new_booking = booking_service.save(booking);
-		
-		if(new_booking.isEmpty()) {
+
+		if (new_booking.isEmpty()) {
 			return ResponseEntity.badRequest().build();
 		}
-		
-		URI uri = URI.create(ServletUriComponentsBuilder.fromCurrentContextPath().path("/read/id=" + booking.getId())
-				.toUriString());
+
+		URI uri = URI.create(
+				ServletUriComponentsBuilder.fromCurrentContextPath().path("/read/id=" + booking.getId()).toUriString());
 		return ResponseEntity.created(uri).body(new_booking.get());
 	}
 
+	@PostMapping("/add/flight={flight_id}/user={user_id}")
+	public ResponseEntity<Booking> addBookingArgs(@RequestBody Booking booking, @PathVariable Integer flight_id,
+			@PathVariable Integer user_id) {
+		Optional<Booking> new_booking = booking_service.saveParams(booking, flight_id, user_id);
+
+		if (new_booking.isEmpty()) {
+			return ResponseEntity.badRequest().build();
+		}
+
+		URI uri = URI.create(
+				ServletUriComponentsBuilder.fromCurrentContextPath().path("/read/id=" + booking.getId()).toUriString());
+		return ResponseEntity.created(uri).body(new_booking.get());
+	}
 
 	@DeleteMapping("/delete/passenger/id={passenger_id}")
 	public ResponseEntity<?> deletePassengerById(@PathVariable Integer passenger_id) {
-		
+
 		booking_service.deletePassengerById(passenger_id);
 
 		return ResponseEntity.noContent().build();
@@ -184,33 +193,42 @@ public class BookingController {
 
 		return ResponseEntity.badRequest().build();
 	}
-	
+
 	///////////////////////////////////////////////////////////////////////
-	
+
 	@PutMapping("/update/passenger")
-	public  ResponseEntity<Passenger> updatePassengers(@RequestBody Passenger passenger) {
-		
+	public ResponseEntity<Passenger> updatePassengers(@RequestBody Passenger passenger) {
+
 		Optional<Passenger> new_passenger = booking_service.update(passenger);
-		if(new_passenger.isPresent()) {
+		if (new_passenger.isPresent()) {
 			return ResponseEntity.ok().body(new_passenger.get());
 
 		}
-		return ResponseEntity.noContent().build();
+		return ResponseEntity.badRequest().build();
 	}
 
-	
+	@PutMapping("/update")
+	public ResponseEntity<Booking> updateBooking(@RequestBody Booking booking) {
+
+		Optional<Booking> new_booking = booking_service.update(booking);
+		if (new_booking.isEmpty()) {
+			return ResponseEntity.badRequest().body(booking);
+
+		}
+		return ResponseEntity.ok(new_booking.get());
+	}
+
 	@GetMapping("/cancel/booking={booking_id}")
-	public ResponseEntity<?> cancelBooking(@PathVariable Integer booking_id){
+	public ResponseEntity<?> cancelBooking(@PathVariable Integer booking_id) {
 		booking_service.cancelBooking(booking_id);
 		return ResponseEntity.noContent().build();
 	}
-	
+
 	@GetMapping("/refund/booking={booking_id}")
-	public ResponseEntity<?> refundTicket(@PathVariable Integer booking_id){
+	public ResponseEntity<?> refundTicket(@PathVariable Integer booking_id) {
 		booking_service.refundBooking(booking_id);
 		return ResponseEntity.noContent().build();
 	}
-
 
 	/*
 	 * Check for uniques by

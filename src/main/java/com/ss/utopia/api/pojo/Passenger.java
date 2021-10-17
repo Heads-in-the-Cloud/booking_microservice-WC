@@ -1,6 +1,7 @@
 package com.ss.utopia.api.pojo;
 
 import java.time.LocalDate;
+import java.util.Objects;
 
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
@@ -14,6 +15,22 @@ import javax.persistence.Table;
 @Table(name="passenger")
 public class Passenger {
 
+	@Override
+	public int hashCode() {
+		return Objects.hash(id);
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Passenger other = (Passenger) obj;
+		return Objects.equals(id, other.id);
+	}
 	@Id
 	@GeneratedValue(strategy=GenerationType.AUTO)
 	private Integer id;
@@ -27,10 +44,26 @@ public class Passenger {
 	public Integer getId() {
 		return id;
 	}
+	
+	public Passenger() {
+		
+	}
 	public void setId(Integer id) {
 		this.id = id;
 	}
 	
+	public Passenger(Integer id, Integer booking_id, String given_name, String family_name, LocalDate dob,
+			String gender, String address) {
+		super();
+		this.id = id;
+		this.booking_id = booking_id;
+		this.given_name = given_name;
+		this.family_name = family_name;
+		this.dob = dob;
+		this.gender = gender;
+		this.address = address;
+	}
+
 	public String getGiven_name() {
 		return given_name;
 	}
