@@ -180,14 +180,12 @@ public class BookingService {
 			BookingGuest booking_guest = booking.getBooking_guest();
 			FlightBookings flight_bookings = booking.getFlight_bookings();
 
-			if (flight_bookings == null || passengers == null
-					|| (booking_agent == null && booking_user == null && booking_guest == null)) {
+			if (flight_bookings == null || (booking_agent == null && booking_user == null && booking_guest == null)) {
 				return Optional.empty();
 			}
 
-			// Booking persist_booking = new Booking(Boolean.TRUE,
-			// generateConfirmationCode());
-			Booking persist_booking = createSimpleBooking().get();
+			Booking persist_booking = new Booking(Boolean.TRUE, generateConfirmationCode());
+			// Booking persist_booking = createSimpleBooking().get();
 
 			persist_booking = booking_repository.save(persist_booking);
 			Integer booking_id = persist_booking.getId();
@@ -202,6 +200,11 @@ public class BookingService {
 				booking_guest.setBooking_id(booking_id);
 			}
 
+			if (passengers != null) {
+				persist_booking.setPassengers(
+						passengers.stream().peek(x -> x.setBooking_id(booking_id)).collect(Collectors.toList()));
+			}
+
 			flight_bookings.setBooking_id(booking_id);
 
 			BookingPayment booking_payment = new BookingPayment();
@@ -212,8 +215,6 @@ public class BookingService {
 			persist_booking.setBooking_user(booking_user);
 			persist_booking.setBooking_guest(booking_guest);
 
-			persist_booking.setPassengers(
-					passengers.stream().peek(x -> x.setBooking_id(booking_id)).collect(Collectors.toList()));
 			persist_booking.setBooking_agent(booking.getBooking_agent());
 			persist_booking.setFlight_bookings(flight_bookings);
 			persist_booking.setBooking_payment(booking_payment);
@@ -225,115 +226,37 @@ public class BookingService {
 	}
 
 	@Transactional // TODO use batch saves
-	public Optional<Booking> saveParams(Booking booking, Integer flight_id, Integer user_id) {
+	public Booking saveParams(Booking booking, Integer flight_id, Integer user_id) {
 
-		try {
-			List<Passenger> passengers = booking.getPassengers();
+		List<Passenger> passengers = booking.getPassengers();
 
-			// Booking persist_booking = new Booking(Boolean.TRUE,
-			// generateConfirmationCode());
-			Booking persist_booking = createSimpleBooking().get();
+		Booking persist_booking = new Booking(Boolean.TRUE, generateConfirmationCode());
 
-			persist_booking = booking_repository.save(persist_booking);
-			Integer booking_id = persist_booking.getId();
+		persist_booking = booking_repository.save(persist_booking);
 
-			User user = user_repository.findById(user_id).get();
-			Integer role_id = user.getUser_role().getId();
+		Integer booking_id = persist_booking.getId();
 
-			if (role_id.equals(ADMIN) || role_id.equals(AGENT)) {
-				BookingAgent booking_agent = new BookingAgent(booking_id, user_id);
-				persist_booking.setBooking_agent(booking_agent);
-			} else {
-				BookingUser booking_user = new BookingUser(booking_id, user_id);
-				persist_booking.setBooking_user(booking_user);
-			}
+		User user = user_repository.findById(user_id).get();
+		Integer role_id = user.getUser_role().getId();
 
-			persist_booking.setFlight_bookings(new FlightBookings(booking_id, flight_id));
+		if (role_id.equals(ADMIN) || role_id.equals(AGENT)) {
+			BookingAgent booking_agent = new BookingAgent(booking_id, user_id);
+			persist_booking.setBooking_agent(booking_agent);
+		} else {
+			BookingUser booking_user = new BookingUser(booking_id, user_id);
+			persist_booking.setBooking_user(booking_user);
+		}
 
-			persist_booking.setBooking_payment(new BookingPayment(booking_id, generateStripeId(), Boolean.FALSE));
+		persist_booking.setFlight_bookings(new FlightBookings(booking_id, flight_id));
 
+		persist_booking.setBooking_payment(new BookingPayment(booking_id, generateStripeId(), Boolean.FALSE));
+
+		if (passengers != null) {
 			persist_booking.setPassengers(
 					passengers.stream().peek(x -> x.setBooking_id(booking_id)).collect(Collectors.toList()));
-
-			return Optional.of(persist_booking);
-		} catch (Exception e) {
-			return Optional.empty();
 		}
-	}
 
-	public Booking saveBookingAgentBooking(Passenger passenger, Integer user_id, Integer flight_id) {
-
-		Booking booking = new Booking();
-		booking.setConfirmation_code(generateConfirmationCode());
-		booking.setIs_active(Boolean.TRUE);
-
-		Session session = sessionFactory.openSession();
-		Transaction tx = session.beginTransaction();
-
-		booking = booking_repository.save(booking);
-
-		passenger.setBooking_id(booking.getId());
-
-		BookingAgent booking_agent = new BookingAgent();
-		booking_agent.setBooking_id(booking.getId());
-		booking_agent.setAgent_id(user_id);
-
-		BookingPayment booking_payment = new BookingPayment();
-		booking_payment.setBooking_id(booking.getId());
-		booking_payment.setRefunded(Boolean.FALSE);
-		booking_payment.setStripe_id(generateStripeId());
-
-		FlightBookings flight_bookings = new FlightBookings();
-		flight_bookings.setBooking_id(booking.getId());
-		flight_bookings.setFlight_id(flight_id);
-
-		passenger_repository.save(passenger);
-		booking_agent_repository.save(booking_agent);
-		flight_bookings_repository.save(flight_bookings);
-		booking_payment_repository.save(booking_payment);
-
-		tx.commit();
-		session.close();
-
-		return booking;
-
-	}
-
-	public Booking saveBookingUserBooking(Passenger passenger, Integer user_id, Integer flight_id) {
-
-		Booking booking = new Booking();
-		booking.setConfirmation_code(generateConfirmationCode());
-		booking.setIs_active(Boolean.TRUE);
-
-		Session session = sessionFactory.openSession();
-		Transaction tx = session.beginTransaction();
-
-		booking = booking_repository.save(booking);
-
-		passenger.setBooking_id(booking.getId());
-
-		BookingUser booking_user = new BookingUser();
-		booking_user.setBooking_id(booking.getId());
-		booking_user.setUser_id(user_id);
-
-		BookingPayment booking_payment = new BookingPayment();
-		booking_payment.setBooking_id(booking.getId());
-		booking_payment.setRefunded(Boolean.FALSE);
-		booking_payment.setStripe_id(generateStripeId());
-
-		FlightBookings flight_bookings = new FlightBookings();
-		flight_bookings.setBooking_id(booking.getId());
-		flight_bookings.setFlight_id(flight_id);
-
-		passenger_repository.save(passenger);
-		booking_user_repository.save(booking_user);
-		flight_bookings_repository.save(flight_bookings);
-		booking_payment_repository.save(booking_payment);
-
-		tx.commit();
-		session.close();
-
-		return booking;
+		return persist_booking;
 
 	}
 
@@ -343,31 +266,111 @@ public class BookingService {
 	}
 
 	@Transactional
-	public Optional<Passenger> update(Passenger passenger) {
+	public Passenger update(Passenger passenger) {
+
+		Passenger passenger_to_save = passenger_repository.findById(passenger.getId()).get();
+
+		if (passenger.getGiven_name() != null) {
+			passenger_to_save.setGiven_name(passenger.getGiven_name());
+		}
+		if (passenger.getFamily_name() != null) {
+			passenger_to_save.setFamily_name(passenger.getFamily_name());
+		}
+		if (passenger.getAddress() != null) {
+			passenger_to_save.setAddress(passenger.getAddress());
+		}
+		if (passenger.getGender() != null) {
+			passenger_to_save.setGender(passenger.getGender());
+		}
+		if (passenger.getDob() != null) {
+			passenger_to_save.setDob(passenger.getDob());
+		}
+
+		return passenger_to_save;
+
+	}
+
+	@Transactional
+	public Booking update(Booking booking) {
+
+		Booking booking_to_update = booking_repository.findById(booking.getId()).get();
+
+		if (booking.getPassengers() != null) {
+			booking.getPassengers().forEach(x -> x.setBooking_id(booking_to_update.getId()));
+			booking.getPassengers().addAll(booking_to_update.getPassengers());
+			booking_to_update.setPassengers(booking.getPassengers());
+
+		}
+
+		if (booking.getIs_active() != null) {
+			booking_to_update.setIs_active(booking.getIs_active());
+		}
+
+		if (booking.getFlight_bookings() != null) {
+
+			booking_to_update.getFlight_bookings().setFlight_id(booking.getFlight_bookings().getFlight_id());
+		}
+
+		if (booking.getBooking_payment() != null) {
+
+			booking_to_update.getBooking_payment().setRefunded(booking.getBooking_payment().getRefunded());
+		}
+
+		if (booking.getBooking_agent() != null) {
+
+			if (booking_to_update.getBooking_agent() == null) {
+
+				booking.getBooking_agent().setBooking_id(booking_to_update.getId());
+				booking_to_update.setBooking_agent(booking.getBooking_agent());
+			} else {
+
+				booking_to_update.getBooking_agent().setAgent_id(booking.getBooking_agent().getAgent_id());
+			}
+		}
+
+		if (booking.getBooking_user() != null) {
+
+			if (booking_to_update.getBooking_user() == null) {
+
+				booking.getBooking_user().setBooking_id(booking_to_update.getId());
+				booking_to_update.setBooking_user(booking.getBooking_user());
+			} else {
+				booking_to_update.getBooking_user().setUser_id(booking.getBooking_user().getUser_id());
+
+			}
+		}
+
+		if (booking.getBooking_guest() != null) {
+
+			if (booking_to_update.getBooking_guest() == null) {
+
+				booking.getBooking_guest().setBooking_id(booking_to_update.getId());
+				booking_to_update.setBooking_guest(booking.getBooking_guest());
+
+			}
+
+			else {
+				booking_to_update.getBooking_guest().setContact_email(booking.getBooking_guest().getContact_email());
+				booking_to_update.getBooking_guest().setContact_phone(booking.getBooking_guest().getContact_phone());
+			}
+
+		}
+
+		booking_to_update.setConfirmation_code(generateConfirmationCode());
+
+		return booking_to_update;
+
+	}
+
+	@Transactional
+	public Optional<BookingAgent> update(BookingAgent booking_agent) {
 		try {
-			if (!passenger_repository.existsById(passenger.getId())) {
-				return Optional.empty();
-			}
 
-			Passenger passenger_to_save = passenger_repository.findById(passenger.getId()).get();
+			BookingAgent booking_agent_to_update = booking_agent_repository.findById(booking_agent.getBooking_id())
+					.get();
+			booking_agent_to_update.setAgent_id(booking_agent.getAgent_id());
+			return Optional.of(booking_agent_to_update);
 
-			if (passenger.getGiven_name() != null) {
-				passenger_to_save.setGiven_name(passenger.getGiven_name());
-			}
-			if (passenger.getFamily_name() != null) {
-				passenger_to_save.setFamily_name(passenger.getFamily_name());
-			}
-			if (passenger.getAddress() != null) {
-				passenger_to_save.setAddress(passenger.getAddress());
-			}
-			if (passenger.getGender() != null) {
-				passenger_to_save.setGender(passenger.getGender());
-			}
-			if (passenger.getDob() != null) {
-				passenger_to_save.setDob(passenger.getDob());
-			}
-
-			return Optional.of(passenger_to_save);
 		} catch (Exception e) {
 			return Optional.empty();
 		}
@@ -375,78 +378,12 @@ public class BookingService {
 	}
 
 	@Transactional
-	public Optional<Booking> update(Booking booking) {
-
+	public Optional<BookingUser> update(BookingUser booking_user) {
 		try {
 
-			Booking booking_to_update = booking_repository.findById(booking.getId()).get();
-
-			if (booking.getPassengers() != null) {
-				booking.getPassengers().forEach(x -> x.setBooking_id(booking_to_update.getId()));
-				booking.getPassengers().addAll(booking_to_update.getPassengers());
-				booking_to_update.setPassengers(booking.getPassengers());
-
-			}
-
-			if (booking.getIs_active() != null) {
-				booking_to_update.setIs_active(booking.getIs_active());
-			}
-
-			if (booking.getFlight_bookings() != null) {
-
-				booking_to_update.getFlight_bookings().setFlight_id(booking.getFlight_bookings().getFlight_id());
-			}
-
-			if (booking.getBooking_payment() != null) {
-
-				booking_to_update.getBooking_payment().setRefunded(booking.getBooking_payment().getRefunded());
-			}
-
-			if (booking.getBooking_agent() != null) {
-
-				if (booking_to_update.getBooking_agent() == null) {
-
-					booking.getBooking_agent().setBooking_id(booking_to_update.getId());
-					booking_to_update.setBooking_agent(booking.getBooking_agent());
-				} else {
-
-					booking_to_update.getBooking_agent().setAgent_id(booking.getBooking_agent().getAgent_id());
-				}
-			}
-
-			if (booking.getBooking_user() != null) {
-
-				if (booking_to_update.getBooking_user() == null) {
-
-					booking.getBooking_user().setBooking_id(booking_to_update.getId());
-					booking_to_update.setBooking_user(booking.getBooking_user());
-				} else {
-					booking_to_update.getBooking_user().setUser_id(booking.getBooking_user().getUser_id());
-
-				}
-			}
-
-			if (booking.getBooking_guest() != null) {
-
-				if (booking_to_update.getBooking_guest() == null) {
-
-					booking.getBooking_guest().setBooking_id(booking_to_update.getId());
-					booking_to_update.setBooking_guest(booking.getBooking_guest());
-
-				}
-
-				else {
-					booking_to_update.getBooking_guest()
-							.setContact_email(booking.getBooking_guest().getContact_email());
-					booking_to_update.getBooking_guest()
-							.setContact_phone(booking.getBooking_guest().getContact_phone());
-				}
-
-			}
-
-			booking_to_update.setConfirmation_code(generateConfirmationCode());
-
-			return Optional.of(booking_to_update);
+			BookingUser booking_user_to_update = booking_user_repository.findById(booking_user.getBooking_id()).get();
+			booking_user_to_update.setUser_id(booking_user.getUser_id());
+			return Optional.of(booking_user_to_update);
 
 		} catch (Exception e) {
 			return Optional.empty();
@@ -454,6 +391,42 @@ public class BookingService {
 
 	}
 
+	@Transactional
+	public Optional<BookingGuest> update(BookingGuest booking_guest) {
+		try {
+
+			BookingGuest booking_guest_to_update = booking_guest_repository.findById(booking_guest.getBooking_id())
+					.get();
+			booking_guest_to_update.setContact_email(booking_guest.getContact_email());
+			booking_guest_to_update.setContact_phone(booking_guest.getContact_phone());
+			return Optional.of(booking_guest_to_update);
+
+		} catch (Exception e) {
+			return Optional.empty();
+		}
+
+	}
+
+	public Optional<BookingPayment> update(BookingPayment booking_payment) {
+
+		try {
+			booking_payment.setStripe_id(generateStripeId());
+			return Optional.of(booking_payment_repository.save(booking_payment));
+		} catch (Exception e) {
+			return Optional.empty();
+		}
+
+	}
+
+	public Optional<FlightBookings> update(FlightBookings flight_bookings) {
+
+		try {
+			return Optional.of(flight_bookings_repository.save(flight_bookings));
+		} catch (Exception e) {
+			return Optional.empty();
+		}
+
+	}
 
 	public Boolean deleteBookingAgent(Integer booking_id) {
 
@@ -487,9 +460,6 @@ public class BookingService {
 		}
 
 	}
-	
-	
-	
 
 	@Transactional
 	public Boolean cancelBooking(Integer booking_id) {
@@ -512,10 +482,6 @@ public class BookingService {
 	public List<BookingPayment> getRefundedBookings() {
 		return booking_payment_repository.findAll().stream().filter(x -> x.getRefunded()).collect(Collectors.toList());
 	}
-	
-	
-	
-	
 
 	public String generateConfirmationCode() {
 		String s = "";

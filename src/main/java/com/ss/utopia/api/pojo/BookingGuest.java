@@ -38,6 +38,18 @@ public class BookingGuest{
 	
 
 	
+	
+
+	public BookingGuest(Integer booking_id, String contact_email, String contact_phone) {
+		super();
+		this.booking_id = booking_id;
+		this.contact_email = contact_email;
+		this.contact_phone = contact_phone;
+	}
+
+	public BookingGuest() {
+		
+	}
 
 	@Override
 	public String toString() {

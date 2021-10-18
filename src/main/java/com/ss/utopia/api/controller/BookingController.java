@@ -1,9 +1,11 @@
 package com.ss.utopia.api.controller;
 
 import java.net.URI;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -14,9 +16,9 @@ import java.util.stream.Collectors;
 import javax.transaction.Transactional;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.dao.DataIntegrityViolationException;
+
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,8 +30,12 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import com.ss.utopia.api.pojo.Booking;
+import com.ss.utopia.api.pojo.BookingAgent;
+import com.ss.utopia.api.pojo.BookingGuest;
 import com.ss.utopia.api.pojo.BookingPayment;
+import com.ss.utopia.api.pojo.BookingUser;
 import com.ss.utopia.api.pojo.Flight;
+import com.ss.utopia.api.pojo.FlightBookings;
 import com.ss.utopia.api.pojo.Passenger;
 import com.ss.utopia.api.service.BookingService;
 import com.ss.utopia.api.service.FlightBookingService;
@@ -135,21 +141,6 @@ public class BookingController {
 		return ResponseEntity.created(uri).body(booking_service.save(passenger));
 	}
 
-	@PostMapping("/add/agent={agent_id}/flight={flight_id}")
-	public Booking addBookingByAgent(@RequestBody Passenger passenger, @PathVariable Integer agent_id,
-			@PathVariable Integer flight_id) {
-		return booking_service.saveBookingAgentBooking(passenger, agent_id, flight_id);
-	}
-
-	@PostMapping("/add/user={user_id}/flight={flight_id}")
-	public ResponseEntity<Booking> addBookingByUser(@RequestBody Passenger passenger, @PathVariable Integer user_id,
-			@PathVariable Integer flight_id) {
-		URI uri = URI.create(ServletUriComponentsBuilder.fromCurrentContextPath()
-				.path("/read/id=" + passenger.getBooking_id()).toUriString());
-
-		return ResponseEntity.created(uri).body(booking_service.saveBookingUserBooking(passenger, user_id, flight_id));
-	}
-
 	@PostMapping("/add")
 	public ResponseEntity<Booking> addBooking(@RequestBody Booking booking) {
 		Optional<Booking> new_booking = booking_service.save(booking);
@@ -166,15 +157,18 @@ public class BookingController {
 	@PostMapping("/add/flight={flight_id}/user={user_id}")
 	public ResponseEntity<Booking> addBookingArgs(@RequestBody Booking booking, @PathVariable Integer flight_id,
 			@PathVariable Integer user_id) {
-		Optional<Booking> new_booking = booking_service.saveParams(booking, flight_id, user_id);
 
-		if (new_booking.isEmpty()) {
+		try {
+			Booking new_booking = booking_service.saveParams(booking, flight_id, user_id);
+
+			URI uri = URI.create(ServletUriComponentsBuilder.fromCurrentContextPath()
+					.path("/read/id=" + booking.getId()).toUriString());
+			return ResponseEntity.created(uri).body(new_booking);
+
+		} catch (NoSuchElementException | DataIntegrityViolationException e) {
 			return ResponseEntity.badRequest().build();
 		}
 
-		URI uri = URI.create(
-				ServletUriComponentsBuilder.fromCurrentContextPath().path("/read/id=" + booking.getId()).toUriString());
-		return ResponseEntity.created(uri).body(new_booking.get());
 	}
 
 	@DeleteMapping("/delete/passenger/id={passenger_id}")
@@ -194,25 +188,109 @@ public class BookingController {
 		return ResponseEntity.badRequest().build();
 	}
 
-	///////////////////////////////////////////////////////////////////////
+	@Transactional
+	@DeleteMapping("/delete/booking_agent/id={booking_id}")
+	public ResponseEntity<?> deleteBookingAgentById(@PathVariable Integer booking_id) {
+		if (booking_service.deleteBookingAgent(booking_id))
+			return ResponseEntity.noContent().build();
+
+		return ResponseEntity.badRequest().build();
+	}
+
+	@Transactional
+	@DeleteMapping("/delete/booking_user/id={booking_id}")
+	public ResponseEntity<?> deleteBookingUserById(@PathVariable Integer booking_id) {
+		if (booking_service.deleteBookingUser(booking_id))
+			return ResponseEntity.noContent().build();
+
+		return ResponseEntity.badRequest().build();
+	}
+
+	@Transactional
+	@DeleteMapping("/delete/booking_guest/id={booking_id}")
+	public ResponseEntity<?> deleteBookingGuest(@PathVariable Integer booking_id) {
+		if (booking_service.deleteBookingGuest(booking_id))
+			return ResponseEntity.noContent().build();
+
+		return ResponseEntity.badRequest().build();
+	}
 
 	@PutMapping("/update/passenger")
 	public ResponseEntity<Passenger> updatePassengers(@RequestBody Passenger passenger) {
 
-		Optional<Passenger> new_passenger = booking_service.update(passenger);
-		if (new_passenger.isPresent()) {
-			return ResponseEntity.ok().body(new_passenger.get());
+		try {
+			Passenger new_passenger = booking_service.update(passenger);
 
+			return ResponseEntity.ok().body(new_passenger);
+
+		} catch (NoSuchElementException | DataIntegrityViolationException e) {
+			return ResponseEntity.badRequest().build();
 		}
-		return ResponseEntity.badRequest().build();
 	}
 
 	@PutMapping("/update")
 	public ResponseEntity<Booking> updateBooking(@RequestBody Booking booking) {
 
-		Optional<Booking> new_booking = booking_service.update(booking);
-		if (new_booking.isEmpty()) {
+		try {
+			Booking new_booking = booking_service.update(booking);
+			return ResponseEntity.ok(new_booking);
+
+		} catch (NoSuchElementException | DataIntegrityViolationException e) {
 			return ResponseEntity.badRequest().body(booking);
+
+		}
+	}
+
+	@PutMapping("/update/booking_agent")
+	public ResponseEntity<BookingAgent> updateBookingAgent(@RequestBody BookingAgent booking_agent) {
+
+		Optional<BookingAgent> new_booking = booking_service.update(booking_agent);
+		if (new_booking.isEmpty()) {
+			return ResponseEntity.badRequest().body(booking_agent);
+
+		}
+		return ResponseEntity.ok(new_booking.get());
+	}
+
+	@PutMapping("/update/booking_user")
+	public ResponseEntity<BookingUser> updateBookingUser(@RequestBody BookingUser booking_user) {
+
+		Optional<BookingUser> new_booking = booking_service.update(booking_user);
+		if (new_booking.isEmpty()) {
+			return ResponseEntity.badRequest().body(booking_user);
+
+		}
+		return ResponseEntity.ok(new_booking.get());
+	}
+
+	@PutMapping("/update/booking_guest")
+	public ResponseEntity<BookingGuest> updateBookingGuest(@RequestBody BookingGuest booking_guest) {
+
+		Optional<BookingGuest> new_booking = booking_service.update(booking_guest);
+		if (new_booking.isEmpty()) {
+			return ResponseEntity.badRequest().body(booking_guest);
+
+		}
+		return ResponseEntity.ok(new_booking.get());
+	}
+
+	@PutMapping("/update/booking_payment")
+	public ResponseEntity<BookingPayment> updateBookingPayment(@RequestBody BookingPayment booking_payment) {
+
+		Optional<BookingPayment> new_booking = booking_service.update(booking_payment);
+		if (new_booking.isEmpty()) {
+			return ResponseEntity.badRequest().body(booking_payment);
+
+		}
+		return ResponseEntity.ok(new_booking.get());
+	}
+
+	@PutMapping("/update/flight_bookings")
+	public ResponseEntity<FlightBookings> updateFlightBookings(@RequestBody FlightBookings flight_bookings) {
+
+		Optional<FlightBookings> new_booking = booking_service.update(flight_bookings);
+		if (new_booking.isEmpty()) {
+			return ResponseEntity.badRequest().body(flight_bookings);
 
 		}
 		return ResponseEntity.ok(new_booking.get());
@@ -239,26 +317,5 @@ public class BookingController {
 		Set<Object> seen = ConcurrentHashMap.newKeySet();
 		return t -> seen.add(keyExtractor.apply(t));
 	}
-
-//////////////////Just use get User ->//////////////////////////////////////////////////
-////////////////// user.getBooking_Methods().getBookings()//////////////////////////////
-////////////////// These queries provide ALL information of the users.//////////////////
-////////////////// /////////////////////////////////////////////////////////////////////
-
-//	@GetMapping(path = "/user/{username}/bookings")
-//	public ResponseEntity<List<Booking>> getUserBooking(@PathVariable String username) {
-//		return ResponseEntity.ok().body(booking_service.getBookingByUsername(username));
-//	}
-//
-//	@GetMapping(path = "/user/{username}/bookings/passengers")
-//	public ResponseEntity<List<Passenger>> getPassengersFromUsername(@PathVariable String username) {
-//		List<Booking> bookings = booking_service.getBookingByUsername(username);
-//		List<Passenger> passengers = new ArrayList<>();
-//		for (Booking b : bookings) {
-//			passengers.addAll(b.getPassengers());
-//		}
-//		return ResponseEntity.ok().body(passengers);
-//	}
-/////////////////////////////////////////////////////////////////////////////////////////
 
 }
