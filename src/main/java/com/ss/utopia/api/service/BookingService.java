@@ -72,154 +72,70 @@ public class BookingService {
 	final Integer TRAVELER = 3;
 
 	public List<Booking> findAllBookings() {
+
 		return booking_repository.findAll();
 	}
 
-	public List<Passenger> findAllPassengers() {
-		return passenger_repository.findAll();
-	}
+	public Booking getBookingById(Integer booking_id) {
 
-	public List<Passenger> getPassengerByBooking(List<Booking> bookings) {
-
-		return bookings.stream().map(x -> passenger_repository.getPassengerByBookingId(x.getId())).flatMap(List::stream)
-				.collect(Collectors.toList());
-	}
-
-	public Optional<List<Booking>> getBookingByUsernameQuery(String username) {
-		try {
-			return Optional.of(booking_repository.getBookingsByUser(username));
-		} catch (Exception e) {
-			return Optional.empty();
-		}
+		return booking_repository.findById(booking_id).get();
 
 	}
 
-	public Passenger save(Passenger passenger) {
-		return passenger_repository.save(passenger);
-	}
-
-	public List<Flight> getFlightByBookingId(List<Booking> bookings) {
-
-		bookings.stream().forEach(x -> {
-
-			System.out.println(flight_repository.getFlightByBooking(x.getId()));
-		});
-
-		return bookings.stream().map(x -> flight_repository.getFlightByBooking(x.getId())).collect(Collectors.toList());
-	}
-
-	public Optional<Booking> getBookingById(Integer booking_id) {
-
-		try {
-			return booking_repository.findById(booking_id);
-		} catch (Exception e) {
-			return Optional.empty();
-		}
-	}
-
-//	public Booking getBookingById(Integer booking_id) {
-//		return booking_repository.getById(booking_id);
-//	}
-
-	public Optional<Passenger> getPassengerById(Integer passenger_id) {
-		try {
-			return Optional.of(passenger_repository.findById(passenger_id).get());
-		} catch (Exception e) {
-			return Optional.empty();
-		}
-	}
-
-	public Boolean deletePassengerById(Integer passenger_id) {
-
-		System.out.println(passenger_id);
-
-		// delete booking if the last passenger is deleted
-		try {
-
-			Passenger passenger = passenger_repository.findById(passenger_id).get();
-
-			passenger_repository.deleteById(passenger_id);
-
-			System.out.println(passenger.getBooking_id());
-
-			if (booking_repository.findById(passenger.getBooking_id()).get().getPassengers().size() == 0) {
-				booking_repository.deleteById(passenger.getBooking_id());
-
-			}
-
-			return Boolean.TRUE;
-
-		} catch (Exception e) {
-
-			return Boolean.FALSE;
-		}
-	}
-
-	public Boolean deleteBookingById(Integer booking_id) {
-		try {
-
-			booking_repository.deleteById(booking_id);
-			return Boolean.TRUE;
-
-		} catch (Exception e) {
-			return Boolean.FALSE;
-		}
-	}
-
-	public Optional<Booking> createSimpleBooking() {
-		return Optional.of(booking_repository.save(new Booking(Boolean.TRUE, generateConfirmationCode())));
+	public Booking createSimpleBooking() {
+		return booking_repository.save(new Booking(Boolean.TRUE, generateConfirmationCode()));
 	}
 
 	@Transactional // TODO use batch saves
 	public Booking save(Booking booking) {
 
-			List<Passenger> passengers = booking.getPassengers();
-			BookingAgent booking_agent = booking.getBooking_agent();
-			BookingUser booking_user = booking.getBooking_user();
-			BookingGuest booking_guest = booking.getBooking_guest();
-			FlightBookings flight_bookings = booking.getFlight_bookings();
+		List<Passenger> passengers = booking.getPassengers();
+		BookingAgent booking_agent = booking.getBooking_agent();
+		BookingUser booking_user = booking.getBooking_user();
+		BookingGuest booking_guest = booking.getBooking_guest();
+		FlightBookings flight_bookings = booking.getFlight_bookings();
 
-			if (flight_bookings == null || (booking_agent == null && booking_user == null && booking_guest == null)) {
-				return null;
-			}
+		if (flight_bookings == null || (booking_agent == null && booking_user == null && booking_guest == null)) {
+			return null;
+		}
 
-			Booking persist_booking = new Booking(Boolean.TRUE, generateConfirmationCode());
-			// Booking persist_booking = createSimpleBooking().get();
+		Booking persist_booking = new Booking(Boolean.TRUE, generateConfirmationCode());
+		// Booking persist_booking = createSimpleBooking().get();
 
-			persist_booking = booking_repository.save(persist_booking);
-			Integer booking_id = persist_booking.getId();
+		persist_booking = booking_repository.save(persist_booking);
+		Integer booking_id = persist_booking.getId();
 
-			if (booking_agent != null) {
-				booking_agent.setBooking_id(booking_id);
-			}
-			if (booking_user != null) {
-				booking_user.setBooking_id(booking_id);
-			}
-			if (booking_guest != null) {
-				booking_guest.setBooking_id(booking_id);
-			}
+		if (booking_agent != null) {
+			booking_agent.setBooking_id(booking_id);
+		}
+		if (booking_user != null) {
+			booking_user.setBooking_id(booking_id);
+		}
+		if (booking_guest != null) {
+			booking_guest.setBooking_id(booking_id);
+		}
 
-			if (passengers != null) {
-				persist_booking.setPassengers(
-						passengers.stream().peek(x -> x.setBooking_id(booking_id)).collect(Collectors.toList()));
-			}
+		if (passengers != null) {
+			persist_booking.setPassengers(
+					passengers.stream().peek(x -> x.setBooking_id(booking_id)).collect(Collectors.toList()));
+		}
 
-			flight_bookings.setBooking_id(booking_id);
+		flight_bookings.setBooking_id(booking_id);
 
-			BookingPayment booking_payment = new BookingPayment();
-			booking_payment.setBooking_id(booking_id);
-			booking_payment.setRefunded(Boolean.FALSE);
-			booking_payment.setStripe_id(generateStripeId());
+		BookingPayment booking_payment = new BookingPayment();
+		booking_payment.setBooking_id(booking_id);
+		booking_payment.setRefunded(Boolean.FALSE);
+		booking_payment.setStripe_id(generateStripeId());
 
-			persist_booking.setBooking_user(booking_user);
-			persist_booking.setBooking_guest(booking_guest);
+		persist_booking.setBooking_user(booking_user);
+		persist_booking.setBooking_guest(booking_guest);
 
-			persist_booking.setBooking_agent(booking.getBooking_agent());
-			persist_booking.setFlight_bookings(flight_bookings);
-			persist_booking.setBooking_payment(booking_payment);
+		persist_booking.setBooking_agent(booking.getBooking_agent());
+		persist_booking.setFlight_bookings(flight_bookings);
+		persist_booking.setBooking_payment(booking_payment);
 
-			return persist_booking;
-		
+		return persist_booking;
+
 	}
 
 	@Transactional // TODO use batch saves
@@ -254,36 +170,6 @@ public class BookingService {
 		}
 
 		return persist_booking;
-
-	}
-
-	public Optional<User> findUserByBookingId(Integer booking_id) {
-		return user_repository.findUserByBookingId(booking_id);
-
-	}
-
-	@Transactional
-	public Passenger update(Passenger passenger) {
-
-		Passenger passenger_to_save = passenger_repository.findById(passenger.getId()).get();
-
-		if (passenger.getGiven_name() != null) {
-			passenger_to_save.setGiven_name(passenger.getGiven_name());
-		}
-		if (passenger.getFamily_name() != null) {
-			passenger_to_save.setFamily_name(passenger.getFamily_name());
-		}
-		if (passenger.getAddress() != null) {
-			passenger_to_save.setAddress(passenger.getAddress());
-		}
-		if (passenger.getGender() != null) {
-			passenger_to_save.setGender(passenger.getGender());
-		}
-		if (passenger.getDob() != null) {
-			passenger_to_save.setDob(passenger.getDob());
-		}
-
-		return passenger_to_save;
 
 	}
 
@@ -359,102 +245,10 @@ public class BookingService {
 
 	}
 
-	@Transactional
-	public Optional<BookingAgent> update(BookingAgent booking_agent) {
-		try {
+	public BookingPayment update(BookingPayment booking_payment) {
 
-			BookingAgent booking_agent_to_update = booking_agent_repository.findById(booking_agent.getBooking_id())
-					.get();
-			booking_agent_to_update.setAgent_id(booking_agent.getAgent_id());
-			return Optional.of(booking_agent_to_update);
-
-		} catch (Exception e) {
-			return Optional.empty();
-		}
-
-	}
-
-	@Transactional
-	public Optional<BookingUser> update(BookingUser booking_user) {
-		try {
-
-			BookingUser booking_user_to_update = booking_user_repository.findById(booking_user.getBooking_id()).get();
-			booking_user_to_update.setUser_id(booking_user.getUser_id());
-			return Optional.of(booking_user_to_update);
-
-		} catch (Exception e) {
-			return Optional.empty();
-		}
-
-	}
-
-	@Transactional
-	public Optional<BookingGuest> update(BookingGuest booking_guest) {
-		try {
-
-			BookingGuest booking_guest_to_update = booking_guest_repository.findById(booking_guest.getBooking_id())
-					.get();
-			booking_guest_to_update.setContact_email(booking_guest.getContact_email());
-			booking_guest_to_update.setContact_phone(booking_guest.getContact_phone());
-			return Optional.of(booking_guest_to_update);
-
-		} catch (Exception e) {
-			return Optional.empty();
-		}
-
-	}
-
-	public Optional<BookingPayment> update(BookingPayment booking_payment) {
-
-		try {
-			booking_payment.setStripe_id(generateStripeId());
-			return Optional.of(booking_payment_repository.save(booking_payment));
-		} catch (Exception e) {
-			return Optional.empty();
-		}
-
-	}
-
-	public Optional<FlightBookings> update(FlightBookings flight_bookings) {
-
-		try {
-			return Optional.of(flight_bookings_repository.save(flight_bookings));
-		} catch (Exception e) {
-			return Optional.empty();
-		}
-
-	}
-
-	public Boolean deleteBookingAgent(Integer booking_id) {
-
-		try {
-			booking_agent_repository.deleteById(booking_id);
-			return Boolean.TRUE;
-		} catch (Exception e) {
-			return Boolean.FALSE;
-		}
-
-	}
-
-	public Boolean deleteBookingUser(Integer booking_id) {
-
-		try {
-			booking_user_repository.deleteById(booking_id);
-			return Boolean.TRUE;
-		} catch (Exception e) {
-			return Boolean.FALSE;
-		}
-
-	}
-
-	public Boolean deleteBookingGuest(Integer booking_id) {
-
-		try {
-			booking_guest_repository.deleteById(booking_id);
-			return Boolean.TRUE;
-		} catch (Exception e) {
-			return Boolean.FALSE;
-		}
+		booking_payment.setStripe_id(generateStripeId());
+		return booking_payment_repository.save(booking_payment);
 
 	}
 
@@ -479,6 +273,14 @@ public class BookingService {
 	public List<BookingPayment> getRefundedBookings() {
 		return booking_payment_repository.findAll().stream().filter(x -> x.getRefunded()).collect(Collectors.toList());
 	}
+
+	public void deleteBookingById(Integer booking_id) {
+
+		booking_repository.deleteById(booking_id);
+
+	}
+
+	/* Generation of random characters */
 
 	public String generateConfirmationCode() {
 		String s = "";

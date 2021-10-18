@@ -22,16 +22,17 @@ public class FlightBookingService {
 	@Autowired
 	FlightRepository flight_repository;
 
-	
-	//Helper used to link users -> bookings -> flights
-	public Optional<List<Flight>> getFlightByBookingId(List<Booking> bookings) {
-		try {
+	// Helper used to link users -> bookings -> flights
+	public List<Flight> getFlightByBookingId(List<Booking> bookings) {
 
-			return Optional.of(bookings.stream().map(x -> flight_repository.getFlightByBooking(x.getId()))
-					.collect(Collectors.toList()));
-		} catch (Exception e) {
-			return Optional.empty();
-		}
+		return bookings.stream().map(x -> flight_repository.getFlightByBooking(x.getId())).collect(Collectors.toList());
 
 	}
+
+	public FlightBookings update(FlightBookings flight_bookings) {
+
+		return flight_bookings_repository.save(flight_bookings);
+
+	}
+
 }
