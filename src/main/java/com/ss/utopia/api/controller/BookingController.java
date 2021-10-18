@@ -143,15 +143,22 @@ public class BookingController {
 
 	@PostMapping("/add")
 	public ResponseEntity<Booking> addBooking(@RequestBody Booking booking) {
-		Optional<Booking> new_booking = booking_service.save(booking);
+		try {
+			Booking new_booking = booking_service.save(booking);
 
-		if (new_booking.isEmpty()) {
+			if (new_booking == null) {
+				return ResponseEntity.badRequest().build(); // Flight or Booking method missing
+
+			}
+
+			URI uri = URI.create(ServletUriComponentsBuilder.fromCurrentContextPath()
+					.path("/read/id=" + booking.getId()).toUriString());
+			return ResponseEntity.created(uri).body(new_booking);
+
+		} catch (Exception e) {
 			return ResponseEntity.badRequest().build();
 		}
 
-		URI uri = URI.create(
-				ServletUriComponentsBuilder.fromCurrentContextPath().path("/read/id=" + booking.getId()).toUriString());
-		return ResponseEntity.created(uri).body(new_booking.get());
 	}
 
 	@PostMapping("/add/flight={flight_id}/user={user_id}")

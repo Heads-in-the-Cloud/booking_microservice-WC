@@ -171,9 +171,8 @@ public class BookingService {
 	}
 
 	@Transactional // TODO use batch saves
-	public Optional<Booking> save(Booking booking) {
+	public Booking save(Booking booking) {
 
-		try {
 			List<Passenger> passengers = booking.getPassengers();
 			BookingAgent booking_agent = booking.getBooking_agent();
 			BookingUser booking_user = booking.getBooking_user();
@@ -181,7 +180,7 @@ public class BookingService {
 			FlightBookings flight_bookings = booking.getFlight_bookings();
 
 			if (flight_bookings == null || (booking_agent == null && booking_user == null && booking_guest == null)) {
-				return Optional.empty();
+				return null;
 			}
 
 			Booking persist_booking = new Booking(Boolean.TRUE, generateConfirmationCode());
@@ -219,10 +218,8 @@ public class BookingService {
 			persist_booking.setFlight_bookings(flight_bookings);
 			persist_booking.setBooking_payment(booking_payment);
 
-			return Optional.of(persist_booking);
-		} catch (Exception e) {
-			return Optional.empty();
-		}
+			return persist_booking;
+		
 	}
 
 	@Transactional // TODO use batch saves

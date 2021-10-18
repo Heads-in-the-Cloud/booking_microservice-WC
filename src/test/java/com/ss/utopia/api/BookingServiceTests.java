@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -223,7 +224,7 @@ public class BookingServiceTests {
 
 		public void save() {
 
-			this.booking = booking_service.save(booking).get(); // save
+			this.booking = booking_service.save(booking); // save
 
 			this.booking_id = booking.getId();
 
@@ -346,6 +347,54 @@ public class BookingServiceTests {
 		}
 
 		@Test
+		public void testAddPassengerMissingField() {
+
+			setup();
+
+			passengers = new ArrayList<>();
+			Passenger p1 = new Passenger(null, null, null, "passenger1", LocalDate.of(1997, 9, 20), "Male", "address1");
+			passengers.add(p1);
+			booking.setPassengers(passengers);
+
+			Assertions.assertThrows(DataIntegrityViolationException.class, () -> {
+
+				save();
+
+			});
+
+		}
+
+		@Test
+		public void testBookingAgentInvalidFK() {
+
+			setup();
+
+			booking.getBooking_agent().setAgent_id(0);
+
+			Assertions.assertThrows(DataIntegrityViolationException.class, () -> {
+
+				save();
+
+			});
+		}
+
+		@Test
+		public void testMissingBooking() {
+
+			setup();
+			booking.setBooking_agent(null);
+			assertEquals(booking_service.save(booking), null);
+		}
+
+		@Test
+		public void testMissingFlight() {
+
+			setup();
+			booking.setFlight_bookings(null);
+			assertEquals(booking_service.save(booking), null);
+		}
+
+		@Test
 		public void testUpdateBookingPassenger() {
 
 			Session session = sessionFactory.openSession();
@@ -364,7 +413,6 @@ public class BookingServiceTests {
 			Booking new_booking = new Booking();
 			new_booking.setId(booking.getId());
 			new_booking.setPassengers(passengers);
-			System.out.println(booking.getId());
 			new_booking = booking_service.update(new_booking);
 
 			assertEquals(new_booking.getPassengers().contains(new_passenger), true);
@@ -452,13 +500,64 @@ public class BookingServiceTests {
 			Booking new_booking = new Booking();
 			new_booking.setId(booking.getId());
 			new_booking.setBooking_agent(new BookingAgent(booking.getId(), null));
-			
+
 			Assertions.assertThrows(DataIntegrityViolationException.class, () -> {
 				Booking empty = booking_service.update(new_booking);
 
 			});
 
-			
+			teardown();
+
+		}
+
+		@Test
+		public void testUpdateInvalidFKUpdate() {
+
+			Session session = sessionFactory.openSession();
+			Transaction tx = session.beginTransaction();
+			setup();
+			save();
+
+			tx.commit();
+			session.close();
+
+			Booking new_booking = new Booking();
+			new_booking.setId(booking.getId());
+			new_booking.setBooking_agent(new BookingAgent(booking.getId(), 0));
+
+			Assertions.assertThrows(DataIntegrityViolationException.class, () -> {
+				Booking empty = booking_service.update(new_booking);
+
+			});
+
+			teardown();
+
+		}
+
+		@Test
+		public void testUpdateInvalidDataUpdate() {
+			Session session = sessionFactory.openSession();
+			Transaction tx = session.beginTransaction();
+			setup();
+			save();
+
+			tx.commit();
+			session.close();
+
+			Passenger new_passenger = new Passenger(null, null, "passenger4", "passenger4", LocalDate.of(1997, 9, 20),
+					"MaleMaleMaleMaleMaleMaleMaleMaleMaleMaleMaleMaleMaleMaleMaleMaleMaleMaleMale", "address1");
+			passengers = new ArrayList<>();
+			passengers.add(new_passenger);
+
+			Booking new_booking = new Booking();
+			new_booking.setId(booking.getId());
+			new_booking.setPassengers(passengers);
+
+			Assertions.assertThrows(DataIntegrityViolationException.class, () -> {
+
+				booking_service.update(new_booking);
+
+			});
 			teardown();
 
 		}
@@ -520,318 +619,178 @@ public class BookingServiceTests {
 			teardown();
 		}
 
-//	@Test
-//	public void testUpdateBookingAgentConflict() {
-//		
-//		Session session = sessionFactory.openSession();
-//		Transaction tx = session.beginTransaction();
-//		setup();
-//		save();
-//		
-//		tx.commit();
-//		session.close();
-//
-//		
-//		
-//		Booking new_booking = new Booking();
-//		new_booking.setId(booking.getId());
-//		new_booking.setBooking_agent(new BookingAgent(booking.getId(), user_repository.findAll().get(0).getId()));
-//		new_booking = booking_service.update(new_booking).get();
-//		new_booking.setBooking_agent(new BookingAgent(booking.getId(), user_repository.findAll().get(1).getId()));
-//		new_booking = booking_service.update(new_booking).get();
-//		
-//		assertEquals(booking_agent_repository.findAll().contains(new_booking.getBooking_agent()), true);
-//		teardown();
-//		
-//	}
 
-//	@Test
-//	public void testUpdateBookingUser() {
-//		
-//		Session session = sessionFactory.openSession();
-//		Transaction tx = session.beginTransaction();
-//		setup();
-//		save();
-//		
-//		tx.commit();
-//		session.close();
-//
-//		
-//		
-//		Booking new_booking = new Booking();
-//		new_booking.setId(booking.getId());
-//		new_booking.setBooking_agent(new BookingAgent(booking.getId(), user_repository.findAll().get(1).getId()));
-//		new_booking = booking_service.update(new_booking).get();
-//
-//		
-//		assertEquals(booking_agent_repository.findAll().contains(new_booking.getBooking_agent()), true);
-//		teardown();
-//		
-//	}
-//	
-//	@Test
-//	public void testUpdateBookingUserConflict() {
-//		
-//		Session session = sessionFactory.openSession();
-//		Transaction tx = session.beginTransaction();
-//		setup();
-//		save();
-//		
-//		tx.commit();
-//		session.close();
-//
-//		
-//		
-//		Booking new_booking = new Booking();
-//		new_booking.setId(booking.getId());
-//		new_booking.setBooking_agent(new BookingAgent(booking.getId(), user_repository.findAll().get(0).getId()));
-//		new_booking = booking_service.update(new_booking).get();
-//		new_booking.setBooking_agent(new BookingAgent(booking.getId(), user_repository.findAll().get(1).getId()));
-//		new_booking = booking_service.update(new_booking).get();
-//		
-//		assertEquals(booking_agent_repository.findAll().contains(new_booking.getBooking_agent()), true);
-//		teardown();
-//		
-//	}
+	@Test
+	public void testAddEntireBookingByAgent() {
 
-//	@Test
-//	public void testAddBookingAgent() {
-//		Passenger passenger = new Passenger();
-//		passenger.setId(null);
-//		passenger.setBooking_id(null);
-//		passenger.setFamily_name("lllllllll");
-//		passenger.setGiven_name("lllllllll");
-//		passenger.setAddress("lllllllll");
-//		passenger.setDob(LocalDate.now());
-//		passenger.setGender("lllllllll");
-//
-//		Integer flight_id = flight_repository.findAll().get(0).getId();
-//		Integer user_id = booking_agent_repository.findAll().get(0).getAgent_id();
-//
-//		booking = booking_service.saveBookingAgentBooking(passenger, user_id, flight_id);
-//
-//		this.booking_id = booking.getId();
-//		assertEquals(true, booking_agent_repository.findAll().stream().map(x -> x.getBooking_id())
-//				.collect(Collectors.toList()).contains(booking.getId()));
-//		assertEquals("ROLE_AGENT", booking_service.findUserByBookingId(booking.getId()).get().getUser_role().getName());
-//
-//		assertEquals(true, booking_payment_repository.findAll().stream().map(x -> x.getBooking_id())
-//				.collect(Collectors.toList()).contains(booking.getId()));
-//		assertEquals(true, flight_bookings_repository.findAll().stream().map(x -> x.getBooking_id())
-//				.collect(Collectors.toList()).contains(booking.getId()));
-//		teardown();
-//
-//	}
-//
-//	@Test
-//	public void testAddBookingUser() {
-//		Passenger passenger = new Passenger();
-//		passenger.setId(null);
-//		passenger.setBooking_id(null);
-//		passenger.setFamily_name("lllllllll");
-//		passenger.setGiven_name("lllllllll");
-//		passenger.setAddress("lllllllll");
-//		passenger.setDob(LocalDate.now());
-//		passenger.setGender("lllllllll");
-//
-//		Integer flight_id = flight_repository.findAll().get(0).getId();
-//		Integer user_id = booking_user_repository.findAll().get(0).getUser_id();
-//
-//		booking = booking_service.saveBookingUserBooking(passenger, user_id, flight_id);
-//		this.booking_id = booking.getId();
-//
-//		assertEquals(true, booking_user_repository.findAll().stream().map(x -> x.getBooking_id())
-//				.collect(Collectors.toList()).contains(booking.getId()));
-//		assertEquals("ROLE_TRAVELER",
-//				booking_service.findUserByBookingId(booking.getId()).get().getUser_role().getName());
-//
-//		assertEquals(true, booking_payment_repository.findAll().stream().map(x -> x.getBooking_id())
-//				.collect(Collectors.toList()).contains(booking.getId()));
-//		assertEquals(true, flight_bookings_repository.findAll().stream().map(x -> x.getBooking_id())
-//				.collect(Collectors.toList()).contains(booking.getId()));
-//		teardown();
-//
-//	}
-//
-//	@Test
-//	public void testAddEntireBookingByAgent() {
-//
-//		List<Passenger> passengers = passenger_repository.findAll().stream().limit(3).collect(Collectors.toList());
-//		FlightBookings flight_bookings = flight_bookings_repository.findAll().get(0);
-//		BookingAgent booking_agent = new BookingAgent();
-//		booking_agent.setAgent_id(user_repository.findAll().stream()
-//				.filter(x -> x.getUser_role().getName().equals("ROLE_AGENT")).findFirst().get().getId());
-//
-//		passengers.forEach(x -> x.setId(null));
-//		;
-//
-//		Booking booking = new Booking();
-//		booking.setPassengers(passengers);
-//		booking.setFlight_bookings(flight_bookings);
-//		booking.setBooking_agent(booking_agent);
-//
-//		Booking inserted_booking = booking_service.save(booking).get();
-//
-//		System.out.println(inserted_booking);
-//
-//		this.booking_id = inserted_booking.getId();
-//
-//		booking = booking_repository.findById(booking_id).get();
-//
-//		assertEquals(booking.getId(), inserted_booking.getId());
-//
-//		assertEquals(booking.getConfirmation_code(), inserted_booking.getConfirmation_code());
-//
-//		assertEquals(booking.getIs_active(), inserted_booking.getIs_active());
-//
-//		assertEquals(booking.getBooking_agent().getAgent_id(), inserted_booking.getBooking_agent().getAgent_id());
-//
-//		assertEquals(collectionsMatch(
-//				booking.getPassengers().stream().map(x -> x.getGiven_name()).collect(Collectors.toList()),
-//				inserted_booking.getPassengers().stream().map(x -> x.getGiven_name()).collect(Collectors.toList())),
-//				true);
-//
-//		assertEquals(collectionsMatch(
-//				booking.getPassengers().stream().map(x -> x.getFamily_name()).collect(Collectors.toList()),
-//				inserted_booking.getPassengers().stream().map(x -> x.getFamily_name()).collect(Collectors.toList())),
-//				true);
-//
-//		assertEquals(collectionsMatch(
-//				booking.getPassengers().stream().map(x -> x.getAddress()).collect(Collectors.toList()),
-//				inserted_booking.getPassengers().stream().map(x -> x.getAddress()).collect(Collectors.toList())), true);
-//
-//		assertEquals(
-//				collectionsMatch(booking.getPassengers().stream().map(x -> x.getId()).collect(Collectors.toList()),
-//						inserted_booking.getPassengers().stream().map(x -> x.getId()).collect(Collectors.toList())),
-//				true);
-//
-//		teardown();
-//
-//	}
-//
-//	@Test
-//	public void testAddEntireBookingByUser() {
-//
-//		List<Passenger> passengers = passenger_repository.findAll().stream().limit(3).collect(Collectors.toList());
-//		FlightBookings flight_bookings = flight_bookings_repository.findAll().get(0);
-//		BookingUser booking_user = new BookingUser();
-//		booking_user.setUser_id(user_repository.findAll().stream()
-//				.filter(x -> x.getUser_role().getName().equals("ROLE_TRAVELER")).findFirst().get().getId());
-//
-//		passengers.forEach(x -> x.setId(null));
-//		;
-//
-//		Booking booking = new Booking();
-//		booking.setPassengers(passengers);
-//		booking.setFlight_bookings(flight_bookings);
-//		booking.setBooking_user(booking_user);
-//
-//		Booking inserted_booking = booking_service.save(booking).get();
-//
-//		System.out.println(inserted_booking);
-//
-//		this.booking_id = inserted_booking.getId();
-//
-//		booking = booking_repository.findById(booking_id).get();
-//
-//		assertEquals(booking.getId(), inserted_booking.getId());
-//
-//		assertEquals(booking.getConfirmation_code(), inserted_booking.getConfirmation_code());
-//
-//		assertEquals(booking.getIs_active(), inserted_booking.getIs_active());
-//
-//		assertEquals(booking.getBooking_user().getUser_id(), inserted_booking.getBooking_user().getUser_id());
-//
-//		assertEquals(collectionsMatch(
-//				booking.getPassengers().stream().map(x -> x.getGiven_name()).collect(Collectors.toList()),
-//				inserted_booking.getPassengers().stream().map(x -> x.getGiven_name()).collect(Collectors.toList())),
-//				true);
-//
-//		assertEquals(collectionsMatch(
-//				booking.getPassengers().stream().map(x -> x.getFamily_name()).collect(Collectors.toList()),
-//				inserted_booking.getPassengers().stream().map(x -> x.getFamily_name()).collect(Collectors.toList())),
-//				true);
-//
-//		assertEquals(collectionsMatch(
-//				booking.getPassengers().stream().map(x -> x.getAddress()).collect(Collectors.toList()),
-//				inserted_booking.getPassengers().stream().map(x -> x.getAddress()).collect(Collectors.toList())), true);
-//
-//		assertEquals(
-//				collectionsMatch(booking.getPassengers().stream().map(x -> x.getId()).collect(Collectors.toList()),
-//						inserted_booking.getPassengers().stream().map(x -> x.getId()).collect(Collectors.toList())),
-//				true);
-//
-//		teardown();
-//
-//	}
+		List<Passenger> passengers = passenger_repository.findAll().stream().limit(3).collect(Collectors.toList());
+		FlightBookings flight_bookings = flight_bookings_repository.findAll().get(0);
+		BookingAgent booking_agent = new BookingAgent();
+		booking_agent.setAgent_id(user_repository.findAll().stream()
+				.filter(x -> x.getUser_role().getName().equals("ROLE_AGENT")).findFirst().get().getId());
+
+		passengers.forEach(x -> x.setId(null));
+		;
+
+		Booking booking = new Booking();
+		booking.setPassengers(passengers);
+		booking.setFlight_bookings(flight_bookings);
+		booking.setBooking_agent(booking_agent);
+
+		Booking inserted_booking = booking_service.save(booking);
+
+		System.out.println(inserted_booking);
+
+		this.booking_id = inserted_booking.getId();
+
+		booking = booking_repository.findById(booking_id).get();
+
+		assertEquals(booking.getId(), inserted_booking.getId());
+
+		assertEquals(booking.getConfirmation_code(), inserted_booking.getConfirmation_code());
+
+		assertEquals(booking.getIs_active(), inserted_booking.getIs_active());
+
+		assertEquals(booking.getBooking_agent().getAgent_id(), inserted_booking.getBooking_agent().getAgent_id());
+
+		assertEquals(collectionsMatch(
+				booking.getPassengers().stream().map(x -> x.getGiven_name()).collect(Collectors.toList()),
+				inserted_booking.getPassengers().stream().map(x -> x.getGiven_name()).collect(Collectors.toList())),
+				true);
+
+		assertEquals(collectionsMatch(
+				booking.getPassengers().stream().map(x -> x.getFamily_name()).collect(Collectors.toList()),
+				inserted_booking.getPassengers().stream().map(x -> x.getFamily_name()).collect(Collectors.toList())),
+				true);
+
+		assertEquals(collectionsMatch(
+				booking.getPassengers().stream().map(x -> x.getAddress()).collect(Collectors.toList()),
+				inserted_booking.getPassengers().stream().map(x -> x.getAddress()).collect(Collectors.toList())), true);
+
+		assertEquals(
+				collectionsMatch(booking.getPassengers().stream().map(x -> x.getId()).collect(Collectors.toList()),
+						inserted_booking.getPassengers().stream().map(x -> x.getId()).collect(Collectors.toList())),
+				true);
+
+		teardown();
+
+	}
+
+	@Test
+	public void testAddEntireBookingByUser() {
+
+		List<Passenger> passengers = passenger_repository.findAll().stream().limit(3).collect(Collectors.toList());
+		FlightBookings flight_bookings = flight_bookings_repository.findAll().get(0);
+		BookingUser booking_user = new BookingUser();
+		booking_user.setUser_id(user_repository.findAll().stream()
+				.filter(x -> x.getUser_role().getName().equals("ROLE_TRAVELER")).findFirst().get().getId());
+
+		passengers.forEach(x -> x.setId(null));
+		;
+
+		Booking booking = new Booking();
+		booking.setPassengers(passengers);
+		booking.setFlight_bookings(flight_bookings);
+		booking.setBooking_user(booking_user);
+
+		Booking inserted_booking = booking_service.save(booking);
+
+		System.out.println(inserted_booking);
+
+		this.booking_id = inserted_booking.getId();
+
+		booking = booking_repository.findById(booking_id).get();
+
+		assertEquals(booking.getId(), inserted_booking.getId());
+
+		assertEquals(booking.getConfirmation_code(), inserted_booking.getConfirmation_code());
+
+		assertEquals(booking.getIs_active(), inserted_booking.getIs_active());
+
+		assertEquals(booking.getBooking_user().getUser_id(), inserted_booking.getBooking_user().getUser_id());
+
+		assertEquals(collectionsMatch(
+				booking.getPassengers().stream().map(x -> x.getGiven_name()).collect(Collectors.toList()),
+				inserted_booking.getPassengers().stream().map(x -> x.getGiven_name()).collect(Collectors.toList())),
+				true);
+
+		assertEquals(collectionsMatch(
+				booking.getPassengers().stream().map(x -> x.getFamily_name()).collect(Collectors.toList()),
+				inserted_booking.getPassengers().stream().map(x -> x.getFamily_name()).collect(Collectors.toList())),
+				true);
+
+		assertEquals(collectionsMatch(
+				booking.getPassengers().stream().map(x -> x.getAddress()).collect(Collectors.toList()),
+				inserted_booking.getPassengers().stream().map(x -> x.getAddress()).collect(Collectors.toList())), true);
+
+		assertEquals(
+				collectionsMatch(booking.getPassengers().stream().map(x -> x.getId()).collect(Collectors.toList()),
+						inserted_booking.getPassengers().stream().map(x -> x.getId()).collect(Collectors.toList())),
+				true);
+
+		teardown();
+
+	}
 
 		public void teardown() {
 			booking_service.deleteBookingById(booking_id);
+		}
 
-//		while (true) {
-//			if (booking_repository.existsById(booking_id)) {
-//				booking_service.deleteBookingById(booking_id);
-//				break;
-//			}
-//		}
+	}
+	@Nested
+	class testQueries {
+
+		String good_id = "user1";
+		List<Passenger> passengers_nested;
+		List<Flight> flights;
+		List<Booking> bookings;
+
+		public void getBookings() {
+			this.bookings = booking_controller.getBookingByUsername(good_id).getBody();
+		}
+
+		public void getFlights() {
+			this.flights = booking_controller.getFlightByUsername(good_id).getBody();
+		}
+
+		public void getPassengers() {
+
+			this.passengers_nested = booking_controller.getPassengerByUsername(good_id).getBody();
 
 		}
 
-//	}
-//	@Nested
-//	class testQueries {
-//
-//		String good_id = "user1";
-//		List<Passenger> passengers_nested;
-//		List<Flight> flights;
-//		List<Booking> bookings;
-//
-//		public void getBookings() {
-//			this.bookings = booking_controller.getBookingByUsername(good_id).getBody();
-//		}
-//
-//		public void getFlights() {
-//			this.flights = booking_controller.getFlightByUsername(good_id).getBody();
-//		}
-//
-//		public void getPassengers() {
-//
-//			this.passengers_nested = booking_controller.getPassengerByUsername(good_id).getBody();
-//
-//		}
-//
-//
-//
-//		@Test
-//		@Transactional
-//		public void testFlights() {
-//			getFlights();
-//			List<Integer> flightIds = booking_controller.getFlightByUsername(good_id).getBody().stream()
-//					.map(x -> x.getId()).collect(Collectors.toList());
-//			List<Integer> flightIdsCheck = this.flights.stream().map(x -> x.getId()).collect(Collectors.toList());
-//			for (Integer id : flightIdsCheck) {
-//				assertEquals(flightIds.contains(id), true);
-//			}
-//			assertEquals(flightIdsCheck.size(), flightIds.size());
-//
-//		}
-//
-//		@Test
-//		@Transactional
-//		public void testPassengers() {
-//			getBookings();
-//			getPassengers();
-//			List<Integer> passengerIds = this.passengers_nested.stream().map(x -> x.getId())
-//					.collect(Collectors.toList());
-//			List<Integer> passengerIdsCheck = booking_controller.getPassengerByUsername(good_id).getBody().stream()
-//					.map(x -> x.getId()).collect(Collectors.toList());
-//			for (Integer id : passengerIdsCheck) {
-//				assertEquals(passengerIds.contains(id), true);
-//			}
-//			assertEquals(passengerIds.size(), passengerIdsCheck.size());
-//		}
-//
-//	}
+
+
+		@Test
+		@Transactional
+		public void testFlights() {
+			getFlights();
+			List<Integer> flightIds = booking_controller.getFlightByUsername(good_id).getBody().stream()
+					.map(x -> x.getId()).collect(Collectors.toList());
+			List<Integer> flightIdsCheck = this.flights.stream().map(x -> x.getId()).collect(Collectors.toList());
+			for (Integer id : flightIdsCheck) {
+				assertEquals(flightIds.contains(id), true);
+			}
+			assertEquals(flightIdsCheck.size(), flightIds.size());
+
+		}
+
+		@Test
+		@Transactional
+		public void testPassengers() {
+			getBookings();
+			getPassengers();
+			List<Integer> passengerIds = this.passengers_nested.stream().map(x -> x.getId())
+					.collect(Collectors.toList());
+			List<Integer> passengerIdsCheck = booking_controller.getPassengerByUsername(good_id).getBody().stream()
+					.map(x -> x.getId()).collect(Collectors.toList());
+			for (Integer id : passengerIdsCheck) {
+				assertEquals(passengerIds.contains(id), true);
+			}
+			assertEquals(passengerIds.size(), passengerIdsCheck.size());
+		}
+
+	
 	}
 
 	@Nested
@@ -971,7 +930,27 @@ public class BookingServiceTests {
 
 			Assertions.assertThrows(DataIntegrityViolationException.class, () -> {
 
-				Booking empty = booking_service.saveParams(booking, 9999, user_id);
+				booking_service.saveParams(booking, 9999, user_id);
+
+			});
+			
+			Assertions.assertThrows(NoSuchElementException.class, () -> {
+
+				booking_service.saveParams(booking, flight_id, 9999);
+
+			});
+
+		}
+		
+		@Test
+		public void testInvalidData() {
+
+			setup();
+
+			Passenger p1 = new Passenger(null, null, null, "lastname", LocalDate.of(1990, 12, 10), "male", "address");
+			Assertions.assertThrows(DataIntegrityViolationException.class, () -> {
+
+				booking_service.saveParams(booking, 9999, user_id);
 
 			});
 
