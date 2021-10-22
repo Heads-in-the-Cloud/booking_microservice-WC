@@ -5,10 +5,14 @@ import java.util.stream.Collectors;
 
 import javax.transaction.Transactional;
 
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.Transaction;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.ss.utopia.api.dao.BookingRepository;
+import com.ss.utopia.api.dao.FlightRepository;
 import com.ss.utopia.api.dao.PassengerRepository;
 import com.ss.utopia.api.pojo.Booking;
 import com.ss.utopia.api.pojo.Passenger;
@@ -22,8 +26,27 @@ public class PassengerBookingService {
 	@Autowired
 	BookingRepository booking_repository;
 
+	@Autowired
+	FlightRepository flight_repository;
+
+	@Autowired
+	SessionFactory sessionFactory;
+
+	@Transactional
 	public Passenger save(Passenger passenger) {
-		return passenger_repository.save(passenger);
+
+		passenger.setId(null); // prevent unintentional update to existing passenger
+
+		Session session = sessionFactory.openSession();
+		Transaction tx = session.beginTransaction();
+
+		flight_repository.updateReservedSeats(passenger.getBooking_id(), 1);
+
+		Passenger new_passenger = passenger_repository.save(passenger);
+
+		tx.commit();
+		session.close();
+		return new_passenger;
 	}
 
 	public List<Passenger> findAllPassengers() {
@@ -41,8 +64,7 @@ public class PassengerBookingService {
 		return bookings.stream().map(x -> passenger_repository.getPassengerByBookingId(x.getId())).flatMap(List::stream)
 				.collect(Collectors.toList());
 	}
-	
-	
+
 	@Transactional
 	public Passenger update(Passenger passenger) {
 
@@ -67,22 +89,26 @@ public class PassengerBookingService {
 		return passenger_to_save;
 
 	}
-	
 
+	@Transactional
 	public void deletePassengerById(Integer passenger_id) {
 
+
+		
 		// delete booking if the last passenger is deleted
 		Passenger passenger = passenger_repository.findById(passenger_id).get();
 
-		passenger_repository.deleteById(passenger_id);
-
-		List<Passenger> passenger_list =  booking_repository.findById(passenger.getBooking_id()).get().getPassengers();
 		
-		if ( passenger_list == null || passenger_list.size() == 0) {
-			
-			booking_repository.deleteById(passenger.getBooking_id());
+		Integer booking_id = passenger.getBooking_id();		
 
-		}
+
+			passenger_repository.deleteById(passenger.getId());
+
+	
+		flight_repository.updateReservedSeats(booking_id, -1);
+
+
+				
 	}
 
 }

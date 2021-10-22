@@ -1,6 +1,7 @@
 package com.ss.utopia.api.controller;
 
 import java.net.URI;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -9,6 +10,7 @@ import javax.transaction.Transactional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,28 +38,26 @@ public class AgentController {
 
 	@Autowired
 	BookingService booking_service;
-	
+
 	@Autowired
 	PassengerBookingService passenger_booking_service;
-	
+
 	@Autowired
 	UserBookingService user_booking_service;
 
-	
-	
 	@GetMapping(path = "/read")
 	public ResponseEntity<List<Booking>> findAllBookings() {
 		return ResponseEntity.ok().body(booking_service.findAllBookings());
 
 	}
-	
+
 	@GetMapping(path = "/read/passengers")
 	public ResponseEntity<List<Passenger>> findAllPassengers() {
-				
+
 		return ResponseEntity.ok().body(passenger_booking_service.findAllPassengers());
-	
+
 	}
-	
+
 	@GetMapping(path = "/read/cancelled")
 	public ResponseEntity<List<Booking>> getCancelledBookings() {
 		return ResponseEntity.ok().body(booking_service.getCancelledBookings());
@@ -67,144 +67,72 @@ public class AgentController {
 	public ResponseEntity<List<BookingPayment>> getRefundedBookings() {
 		return ResponseEntity.ok().body(booking_service.getRefundedBookings());
 	}
-	
-	
+
 	@PostMapping("/add")
-	public ResponseEntity<Booking> addBooking(@RequestBody Booking booking) {
-		try {
-			
-			Booking new_booking = booking_service.save(booking);
+	public ResponseEntity<Booking> addBooking(@RequestBody Booking booking) throws SQLException {
 
-			if (new_booking == null) {
-				return ResponseEntity.badRequest().build(); // Flight or Booking method missing
+		Booking new_booking = booking_service.save(booking);
 
-			}
+		if (new_booking == null) {
+			throw new SQLException("Must specify flight Id and a booking method"); // Flight or Booking method missing
 
-			URI uri = URI.create(ServletUriComponentsBuilder.fromCurrentContextPath()
-					.path("/read/id=" + booking.getId()).toUriString());
-			return ResponseEntity.created(uri).body(new_booking);
-
-		} catch (Exception e) {
-			
-			return ResponseEntity.badRequest().build();
 		}
+
+		URI uri = URI.create(
+				ServletUriComponentsBuilder.fromCurrentContextPath().path("/read/id=" + booking.getId()).toUriString());
+		return ResponseEntity.created(uri).body(new_booking);
 
 	}
 	
+	@PostMapping("/add/booking_agent")
+	public ResponseEntity<BookingAgent> addBookingAgent(@RequestBody BookingAgent booking_agent) throws SQLException {
+
+		URI uri = URI.create(ServletUriComponentsBuilder.fromCurrentContextPath()
+				.path("/read/id=" + booking_agent.getBooking_id()).toUriString());
+		return ResponseEntity.created(uri).body(user_booking_service.save(booking_agent));
+
+	}
+
 	@PutMapping("/update")
 	public ResponseEntity<Booking> updateBooking(@RequestBody Booking booking) {
 
-		try {
-			Booking new_booking = booking_service.update(booking);
-			return ResponseEntity.ok(new_booking);
+		Booking new_booking = booking_service.update(booking);
+		return ResponseEntity.ok(new_booking);
 
-		} catch (NoSuchElementException | DataIntegrityViolationException e) {
-			return ResponseEntity.badRequest().body(booking);
+	}
 
-		}
+	@GetMapping("/overrideTripCancellation/id={booking_id}")
+	public ResponseEntity<Void> updateBooking(@PathVariable Integer booking_id) {
+
+		booking_service.overrideTripCancellation(booking_id);
+		return ResponseEntity.ok().build();
+
 	}
 	
+
 	@PutMapping("/update/booking_agent")
 	public ResponseEntity<BookingAgent> updateBookingAgent(@RequestBody BookingAgent booking_agent) {
 
-		try {
-
-			BookingAgent new_booking = user_booking_service.update(booking_agent);
-			return ResponseEntity.ok(new_booking);
-		} catch (DataIntegrityViolationException e) {
-			return ResponseEntity.badRequest().body(booking_agent);
-
-		}
+		BookingAgent new_booking = user_booking_service.update(booking_agent);
+		return ResponseEntity.ok(new_booking);
 	}
 
-	@PutMapping("/update/booking_user")
-	public ResponseEntity<BookingUser> updateBookingUser(@RequestBody BookingUser booking_user) {
-
-		try {
-
-			BookingUser new_booking = user_booking_service.update(booking_user);
-			return ResponseEntity.ok(new_booking);
-
-		} catch (DataIntegrityViolationException e) {
-
-			return ResponseEntity.badRequest().body(booking_user);
-
-		}
-
-	}
-
-	@PutMapping("/update/booking_guest")
-	public ResponseEntity<BookingGuest> updateBookingGuest(@RequestBody BookingGuest booking_guest) {
-
-		try {
-			BookingGuest new_booking = user_booking_service.update(booking_guest);
-			return ResponseEntity.ok(new_booking);
-
-		} catch (DataIntegrityViolationException e) {
-			return ResponseEntity.badRequest().body(booking_guest);
-
-		}
-	}
-	
 	@Transactional
 	@DeleteMapping("/delete/booking={booking_id}")
 	public ResponseEntity<?> deleteBookingById(@PathVariable Integer booking_id) {
-		try {
 
-			booking_service.deleteBookingById(booking_id);
-			return ResponseEntity.noContent().build();
+		booking_service.deleteBookingById(booking_id);
+		return ResponseEntity.noContent().build();
 
-		} catch (NoSuchElementException e) {
-
-			return ResponseEntity.badRequest().build();
-
-		}
 	}
 
 	@Transactional
 	@DeleteMapping("/delete/booking_agent/id={booking_id}")
 	public ResponseEntity<?> deleteBookingAgentById(@PathVariable Integer booking_id) {
 
-		try {
-
-			user_booking_service.deleteBookingAgent(booking_id);
-			return ResponseEntity.noContent().build();
-
-		} catch (NoSuchElementException e) {
-
-			return ResponseEntity.badRequest().build();
-
-		}
+		user_booking_service.deleteBookingAgent(booking_id);
+		return ResponseEntity.noContent().build();
 
 	}
-
-	@Transactional
-	@DeleteMapping("/delete/booking_user/id={booking_id}")
-	public ResponseEntity<?> deleteBookingUserById(@PathVariable Integer booking_id) {
-		try {
-
-			user_booking_service.deleteBookingUser(booking_id);
-			return ResponseEntity.noContent().build();
-
-		} catch (NoSuchElementException e) {
-
-			return ResponseEntity.badRequest().build();
-		}
-	}
-
-	@Transactional
-	@DeleteMapping("/delete/booking_guest/id={booking_id}")
-	public ResponseEntity<?> deleteBookingGuest(@PathVariable Integer booking_id) {
-		try {
-			user_booking_service.deleteBookingGuest(booking_id);
-			return ResponseEntity.noContent().build();
-
-		} catch (NoSuchElementException e) {
-
-			return ResponseEntity.badRequest().build();
-		}
-	}
-	
-	
 
 }

@@ -1,5 +1,6 @@
 package com.ss.utopia.api.service;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -47,7 +48,8 @@ public class UserBookingService {
 	@Autowired
 	BookingGuestRepository booking_guest_repository;
 
-	
+	private final String user = "ROLE_TRAVELER";
+
 	public Optional<User> findUserByBookingId(Integer booking_id) {
 
 		return user_repository.findUserByBookingId(booking_id);
@@ -59,7 +61,32 @@ public class UserBookingService {
 		return booking_repository.getBookingsByUser(username);
 
 	}
-	
+
+	public BookingAgent save(BookingAgent booking_agent) throws SQLException {
+
+		if (user_repository.findById(booking_agent.getAgent_id()).get().getUser_role().getName().equals(user)) {
+			throw new SQLException("User is not an ADMIN/AGENT");
+		}
+
+		return booking_agent_repository.save(booking_agent);
+
+	}
+
+	public BookingUser save(BookingUser booking_user) throws SQLException {
+
+		if (!user_repository.findById(booking_user.getUser_id()).get().getUser_role().getName().equals(user)) {
+			throw new SQLException("User is not a TRAVELER");
+
+		}
+		return booking_user_repository.save(booking_user);
+
+	}
+
+	public BookingGuest save(BookingGuest booking_guest) {
+
+		return booking_guest_repository.save(booking_guest);
+
+	}
 
 	@Transactional
 	public BookingAgent update(BookingAgent booking_agent) {

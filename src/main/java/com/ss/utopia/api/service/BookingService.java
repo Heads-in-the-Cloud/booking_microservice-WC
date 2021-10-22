@@ -1,5 +1,6 @@
 package com.ss.utopia.api.service;
 
+import java.sql.SQLException;
 import java.util.Arrays;
 
 import java.util.List;
@@ -87,8 +88,11 @@ public class BookingService {
 	}
 
 	@Transactional // TODO use batch saves
-	public Booking save(Booking booking) {
+	public Booking save(Booking booking) throws SQLException {
 
+		Session session = sessionFactory.openSession();
+		Transaction tx = session.beginTransaction();
+		
 		List<Passenger> passengers = booking.getPassengers();
 		BookingAgent booking_agent = booking.getBooking_agent();
 		BookingUser booking_user = booking.getBooking_user();
@@ -96,11 +100,10 @@ public class BookingService {
 		FlightBookings flight_bookings = booking.getFlight_bookings();
 
 		if (flight_bookings == null || (booking_agent == null && booking_user == null && booking_guest == null)) {
-			return null;
+			throw new SQLException("Booking type required");
 		}
 
 		Booking persist_booking = new Booking(Boolean.TRUE, generateConfirmationCode());
-		// Booking persist_booking = createSimpleBooking().get();
 
 		persist_booking = booking_repository.save(persist_booking);
 		Integer booking_id = persist_booking.getId();
@@ -115,11 +118,6 @@ public class BookingService {
 			booking_guest.setBooking_id(booking_id);
 		}
 
-		if (passengers != null) {
-			persist_booking.setPassengers(
-					passengers.stream().peek(x -> x.setBooking_id(booking_id)).collect(Collectors.toList()));
-		}
-
 		flight_bookings.setBooking_id(booking_id);
 
 		BookingPayment booking_payment = new BookingPayment();
@@ -127,6 +125,8 @@ public class BookingService {
 		booking_payment.setRefunded(Boolean.FALSE);
 		booking_payment.setStripe_id(generateStripeId());
 
+		
+		
 		persist_booking.setBooking_user(booking_user);
 		persist_booking.setBooking_guest(booking_guest);
 
@@ -134,6 +134,17 @@ public class BookingService {
 		persist_booking.setFlight_bookings(flight_bookings);
 		persist_booking.setBooking_payment(booking_payment);
 
+		if (passengers != null) {
+			flight_repository.updateReservedSeats(booking_id, passengers.size());
+
+			persist_booking.setPassengers(
+					passengers.stream().peek(x -> x.setBooking_id(booking_id)).collect(Collectors.toList()));
+		}
+		
+		tx.commit();
+		session.close();
+		
+		
 		return persist_booking;
 
 	}
@@ -141,8 +152,9 @@ public class BookingService {
 	@Transactional // TODO use batch saves
 	public Booking saveParams(Booking booking, Integer flight_id, Integer user_id) {
 
+		
 		List<Passenger> passengers = booking.getPassengers();
-
+				
 		Booking persist_booking = new Booking(Boolean.TRUE, generateConfirmationCode());
 
 		persist_booking = booking_repository.save(persist_booking);
@@ -165,6 +177,9 @@ public class BookingService {
 		persist_booking.setBooking_payment(new BookingPayment(booking_id, generateStripeId(), Boolean.FALSE));
 
 		if (passengers != null) {
+
+			flight_repository.updateReservedSeats(booking_id, passengers.size());
+
 			persist_booking.setPassengers(
 					passengers.stream().peek(x -> x.setBooking_id(booking_id)).collect(Collectors.toList()));
 		}
@@ -179,6 +194,9 @@ public class BookingService {
 		Booking booking_to_update = booking_repository.findById(booking.getId()).get();
 
 		if (booking.getPassengers() != null) {
+
+			flight_repository.updateReservedSeats(booking.getId(), booking.getPassengers().size());
+
 			booking.getPassengers().forEach(x -> x.setBooking_id(booking_to_update.getId()));
 			booking.getPassengers().addAll(booking_to_update.getPassengers());
 			booking_to_update.setPassengers(booking.getPassengers());
@@ -244,6 +262,9 @@ public class BookingService {
 		return booking_to_update;
 
 	}
+	
+	
+	
 
 	public BookingPayment update(BookingPayment booking_payment) {
 
@@ -255,7 +276,21 @@ public class BookingService {
 	@Transactional
 	public Boolean cancelBooking(Integer booking_id) {
 		Booking booking = booking_repository.findById(booking_id).get();
+		if (booking.getIs_active() && booking.getPassengers() != null) {
+			flight_repository.updateReservedSeats(booking_id, -(booking.getPassengers().size()));
+		}
 		booking.setIs_active(Boolean.FALSE);
+		return Boolean.TRUE;
+	}
+
+	@Transactional
+	public Boolean overrideTripCancellation(Integer booking_id) {
+
+		Booking booking = booking_repository.findById(booking_id).get();
+		if (!booking.getIs_active() && booking.getPassengers() != null) {
+			flight_repository.updateReservedSeats(booking_id, booking.getPassengers().size());
+		}
+		booking.setIs_active(Boolean.TRUE);
 		return Boolean.TRUE;
 	}
 
@@ -274,7 +309,14 @@ public class BookingService {
 		return booking_payment_repository.findAll().stream().filter(x -> x.getRefunded()).collect(Collectors.toList());
 	}
 
+	@Transactional
 	public void deleteBookingById(Integer booking_id) {
+
+		Booking booking_to_delete = booking_repository.findById(booking_id).get();
+		if (booking_to_delete.getPassengers() != null) {
+			flight_repository.updateReservedSeats(booking_id, -(booking_to_delete.getPassengers().size()));
+
+		}
 
 		booking_repository.deleteById(booking_id);
 
